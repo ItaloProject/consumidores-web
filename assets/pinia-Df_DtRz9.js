@@ -1,0 +1,1 @@
+import{X as e}from"./index-BZfE-iN9.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

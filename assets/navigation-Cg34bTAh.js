@@ -1,1 +1,0 @@
-var e=`Formulários`,t=[{title:`Início`,caption:`Visão geral`,icon:`home`,route:`/`},{title:`CONSUMIDORES`,caption:`Relação na obra`,icon:`groups`,route:`/consumidores`},{title:`DESLIGAMENTO`,caption:`Relação de desligamento`,icon:`power_off`,route:`/desligamento`}];export{t as n,e as t};

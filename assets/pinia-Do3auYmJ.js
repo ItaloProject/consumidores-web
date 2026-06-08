@@ -1,1 +1,0 @@
-import{z as e}from"./index-GZ6R3kum.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

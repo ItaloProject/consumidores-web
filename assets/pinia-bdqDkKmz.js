@@ -1,0 +1,1 @@
+import{V as e}from"./index-CI96U_tB.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

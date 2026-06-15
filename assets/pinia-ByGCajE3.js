@@ -1,0 +1,1 @@
+import{p as e}from"./index-DCcqyjn2.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

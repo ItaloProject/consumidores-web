@@ -1,1 +1,0 @@
-import{p as e}from"./index-CId2g3Rb.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

@@ -269,7 +269,7 @@
             :pagination="{ rowsPerPage: 0 }"
             hide-pagination
             virtual-scroll
-            :virtual-scroll-item-size="56"
+            :virtual-scroll-item-size="88"
             style="max-height: 68vh"
           >
             <template #header="props">
@@ -277,6 +277,7 @@
                 <q-th rowspan="2" auto-width>Nº</q-th>
                 <q-th rowspan="2" style="min-width: 180px">NOME</q-th>
                 <q-th rowspan="2" style="min-width: 130px">NÚMERO DO MEDIDOR</q-th>
+                <q-th rowspan="2" style="min-width: 100px">FOTO DO MEDIDOR</q-th>
                 <q-th colspan="3">TIPO DE LIGAÇÃO</q-th>
                 <q-th colspan="3">PADRÃO</q-th>
                 <q-th rowspan="2" style="min-width: 140px">POSTE DE LIGAÇÃO</q-th>
@@ -311,6 +312,21 @@
                     :error-message="medidorFieldError(props.row) ?? undefined"
                     @update:model-value="onNumeroMedidorChange(props.row)"
                   />
+                </q-td>
+                <q-td class="text-center">
+                  <MeterPhotoCell
+                    v-model="props.row.fotoMedidor"
+                    :selected="selectedConsumidorId === props.row.id"
+                    :error="fotoMedidorHasError(props.row)"
+                    @select="selectedConsumidorId = props.row.id"
+                    @pick="openPhotoPicker(props.row.id)"
+                  />
+                  <div
+                    v-if="fotoMedidorFieldError(props.row)"
+                    class="meter-photo-error text-negative"
+                  >
+                    {{ fotoMedidorFieldError(props.row) }}
+                  </div>
                 </q-td>
 
                 <q-td v-for="tipo in tiposLigacao" :key="'tl-' + tipo.value" class="text-center">
@@ -366,6 +382,13 @@
       </template>
       <!-- /v-if distrital -->
 
+      <input
+        ref="photoInputRef"
+        type="file"
+        accept="image/*"
+        class="hidden-input"
+        @change="handlePhotoChange"
+      />
     </div>
   </q-page>
 </template>
@@ -374,13 +397,15 @@
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import type { QTableColumn } from 'quasar';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import MeterPhotoCell from 'src/components/MeterPhotoCell.vue';
 import { useConsumidoresStore, FORNECEDOR_FIXO, REGIONAL_FIXA, TEC_OBRA_FIXO } from 'src/stores/consumidores';
-import type { ObraInfo } from 'src/stores/consumidores';
+import type { Consumidor, ObraInfo } from 'src/stores/consumidores';
 import { consumidorPreenchido, exportToExcel } from 'src/utils/excel';
 import { exportToPdf } from 'src/utils/pdf';
 import {
   applyTipoLigacaoFromMedidor,
+  getFotoMedidorFieldError,
   getMedidorFieldError,
   validateConsumidoresParaExportacao,
   consumidorComDados,
@@ -398,6 +423,9 @@ const { obra, consumidores, distrital } = storeToRefs(store);
 
 const { addConsumidor, removeConsumidor, resetForm, syncDatas, touchConsumidor } = store;
 const obraValidacaoAtiva = ref(false);
+const selectedConsumidorId = ref<number | null>(null);
+const photoPickerConsumidorId = ref<number | null>(null);
+const photoInputRef = ref<HTMLInputElement | null>(null);
 
 const preenchidosCount = computed(
   () => consumidores.value.filter(consumidorPreenchido).length,
@@ -414,6 +442,70 @@ watch(
 function medidorFieldError(consumidor: (typeof consumidores.value)[number]) {
   return getMedidorFieldError(consumidor);
 }
+
+function fotoMedidorFieldError(consumidor: Consumidor) {
+  if (!obraValidacaoAtiva.value) return null;
+  return getFotoMedidorFieldError(consumidor);
+}
+
+function fotoMedidorHasError(consumidor: Consumidor) {
+  return Boolean(fotoMedidorFieldError(consumidor));
+}
+
+function openPhotoPicker(consumidorId: number) {
+  selectedConsumidorId.value = consumidorId;
+  photoPickerConsumidorId.value = consumidorId;
+  photoInputRef.value?.click();
+}
+
+function readFileAsync(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => resolve(event.target?.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  const consumidorId = photoPickerConsumidorId.value;
+  if (!file || consumidorId == null) return;
+
+  const consumidor = consumidores.value.find((row) => row.id === consumidorId);
+  if (!consumidor) return;
+
+  consumidor.fotoMedidor = await readFileAsync(file);
+  (event.target as HTMLInputElement).value = '';
+  photoPickerConsumidorId.value = null;
+}
+
+async function handleGlobalPaste(event: ClipboardEvent) {
+  const item = Array.from(event.clipboardData?.items ?? []).find((entry) =>
+    entry.type.startsWith('image/'),
+  );
+  if (!item) return;
+
+  const targetId = selectedConsumidorId.value;
+  if (targetId == null) return;
+
+  const consumidor = consumidores.value.find((row) => row.id === targetId);
+  if (!consumidor) return;
+
+  event.preventDefault();
+  const file = item.getAsFile();
+  if (!file) return;
+
+  consumidor.fotoMedidor = await readFileAsync(file);
+}
+
+onMounted(() => {
+  document.addEventListener('paste', handleGlobalPaste);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('paste', handleGlobalPaste);
+});
 
 function onNumeroMedidorChange(consumidor: (typeof consumidores.value)[number]) {
   applyTipoLigacaoFromMedidor(consumidor);
@@ -569,6 +661,7 @@ function handleReset() {
   }).onOk(() => {
     resetForm();
     obraValidacaoAtiva.value = false;
+    selectedConsumidorId.value = null;
     $q.notify({ type: 'info', message: 'Formulário limpo.' });
   });
 }
@@ -603,5 +696,16 @@ function handleReset() {
 
 .padrao-error--last {
   border-right: 1.5px solid rgba(220, 38, 38, 0.55) !important;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.meter-photo-error {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  max-width: 96px;
 }
 </style>

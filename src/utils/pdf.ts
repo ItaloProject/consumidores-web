@@ -8,6 +8,24 @@ import { publicAsset } from './assets';
 
 const BANNER_URL = publicAsset('template/banner.png');
 
+const PHOTO_PAGE_W = 210;
+const PHOTO_PAGE_H = 297;
+const PHOTO_MX = 8;
+const PHOTO_CONT_W = PHOTO_PAGE_W - PHOTO_MX * 2;
+const PHOTO_W = PHOTO_CONT_W;
+const PHOTO_H = PHOTO_W * (9.6 / 12.8);
+const METER_SEC_H = 6 + 6 + PHOTO_H + 4;
+
+const LBLUE: [number, number, number] = [189, 215, 238];
+const DBLUE: [number, number, number] = [31, 73, 125];
+const LGRAY: [number, number, number] = [242, 242, 242];
+const GRAY: [number, number, number] = [166, 166, 166];
+
+type DocEx = jsPDF & {
+  lastAutoTable?: { finalY: number };
+  internal: { getNumberOfPages(): number };
+};
+
 async function loadBannerBase64(): Promise<string> {
   const response = await fetch(BANNER_URL);
   if (!response.ok) {
@@ -81,6 +99,91 @@ function buildObraTable(doc: jsPDF, obra: ObraInfo, startY: number) {
   });
 }
 
+function drawPhotoPlaceholder(doc: jsPDF, x: number, y: number, width: number, height: number) {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(180, 180, 180);
+  doc.text('Sem foto', x + width / 2, y + height / 2, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+}
+
+function drawMeterPhotoSection(doc: jsPDF, consumidor: Consumidor, y: number): number {
+  doc.setFillColor(...LBLUE);
+  doc.rect(PHOTO_MX, y, PHOTO_CONT_W, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(...DBLUE);
+  doc.text('EVIDÊNCIAS FOTOGRÁFICAS:', PHOTO_MX + 2, y + 4);
+  y += 6;
+
+  const medidorLabel = consumidor.numeroMedidor.trim() || '—';
+  doc.setFillColor(...LGRAY);
+  doc.rect(PHOTO_MX, y, PHOTO_W, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(...DBLUE);
+  doc.text(`MEDIDOR Nº ${medidorLabel}`, PHOTO_MX + 2, y + 4);
+  y += 6;
+
+  doc.setDrawColor(...GRAY);
+  doc.rect(PHOTO_MX, y, PHOTO_W, PHOTO_H);
+
+  if (consumidor.fotoMedidor) {
+    const fmt = consumidor.fotoMedidor.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    try {
+      doc.addImage(
+        consumidor.fotoMedidor,
+        fmt,
+        PHOTO_MX + 0.5,
+        y + 0.5,
+        PHOTO_W - 1,
+        PHOTO_H - 1,
+      );
+    } catch {
+      drawPhotoPlaceholder(doc, PHOTO_MX, y, PHOTO_W, PHOTO_H);
+    }
+  } else {
+    drawPhotoPlaceholder(doc, PHOTO_MX, y, PHOTO_W, PHOTO_H);
+  }
+
+  return y + PHOTO_H + 4;
+}
+
+function drawMeterPhotoPages(doc: DocEx, consumidores: Consumidor[]) {
+  doc.addPage('a4', 'portrait');
+  let y = PHOTO_MX;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...DBLUE);
+  doc.text('FOTOS DOS MEDIDORES', PHOTO_PAGE_W / 2, y + 2, { align: 'center' });
+  y += 8;
+
+  for (const consumidor of consumidores) {
+    if (y + METER_SEC_H > PHOTO_PAGE_H - PHOTO_MX) {
+      doc.addPage('a4', 'portrait');
+      y = PHOTO_MX;
+    }
+
+    y = drawMeterPhotoSection(doc, consumidor, y);
+  }
+}
+
+function addPageNumbers(doc: DocEx) {
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+    const isPortrait = doc.internal.pageSize.getWidth() < doc.internal.pageSize.getHeight();
+    const pageWidth = isPortrait ? PHOTO_PAGE_W : 297;
+    const pageHeight = isPortrait ? PHOTO_PAGE_H : 210;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Página ${page} / ${totalPages}`, pageWidth / 2, pageHeight - 4, { align: 'center' });
+  }
+}
+
 export async function exportToPdf(obra: ObraInfo, consumidores: Consumidor[]) {
   const preenchidos = getConsumidoresPreenchidos(consumidores);
   if (preenchidos.length === 0) {
@@ -89,7 +192,7 @@ export async function exportToPdf(obra: ObraInfo, consumidores: Consumidor[]) {
 
   const banner = await loadBannerBase64();
   const fileName = buildExportFileName(obra, 'pdf');
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }) as DocEx;
 
   doc.addImage(banner, 'PNG', 8, 6, 281, 22);
 
@@ -150,6 +253,9 @@ export async function exportToPdf(obra: ObraInfo, consumidores: Consumidor[]) {
       14: { halign: 'center', cellWidth: 18 },
     },
   });
+
+  drawMeterPhotoPages(doc, preenchidos);
+  addPageNumbers(doc);
 
   doc.save(fileName);
   return fileName;

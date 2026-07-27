@@ -27,6 +27,7 @@ export interface Consumidor {
   id: number;
   nome: string;
   numeroMedidor: string;
+  fotoMedidor: string;
   tipoLigacao: TipoLigacao;
   padrao: PadraoTipo;
   ramalDuplex: RamalOpcao;
@@ -40,6 +41,7 @@ function createEmptyConsumidor(id: number): Consumidor {
     id,
     nome: '',
     numeroMedidor: '',
+    fotoMedidor: '',
     tipoLigacao: '',
     padrao: '',
     ramalDuplex: '',

@@ -57,6 +57,14 @@ export function validateMedidorPorTipoLigacao(consumidor: Consumidor): string | 
   return null;
 }
 
+export function getFotoMedidorFieldError(consumidor: Consumidor): string | null {
+  if (!consumidorComDados(consumidor)) return null;
+  if (!consumidor.fotoMedidor) {
+    return 'Anexe a foto do medidor.';
+  }
+  return null;
+}
+
 export function getMedidorFieldError(consumidor: Consumidor): string | null {
   const prefix = MEDIDOR_PREFIX[consumidor.tipoLigacao];
   if (!prefix) return null;
@@ -91,6 +99,10 @@ export function validateConsumidoresParaExportacao(consumidores: Consumidor[]): 
 
     if (!consumidor.padrao) {
       errors.push(`Linha ${consumidor.id}${identificacao}: selecione o Padrão (5M, 7M ou CPP).`);
+    }
+
+    if (!consumidor.fotoMedidor) {
+      errors.push(`Linha ${consumidor.id}${identificacao}: anexe a foto do medidor.`);
     }
   }
 

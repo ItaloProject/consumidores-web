@@ -1,0 +1,1 @@
+import{d as e}from"./index-BEc4Un5w.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

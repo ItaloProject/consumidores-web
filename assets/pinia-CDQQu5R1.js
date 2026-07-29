@@ -1,0 +1,1 @@
+import{u as e}from"./index-ByHL3ZSp.js";var t=e(({app:e,store:t})=>{e.use(t)});export{t as default};

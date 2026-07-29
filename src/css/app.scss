@@ -25,6 +25,25 @@
   --radius-md: 16px;
   --radius-lg: 22px;
   --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --portal-bg: #f4f6fb;
+  --portal-bg-accent:
+    radial-gradient(circle at 0% 0%, rgba(185, 28, 28, 0.04), transparent 34%),
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.06), transparent 28%);
+  --portal-surface: #ffffff;
+  --portal-surface-muted: #f8fafc;
+  --portal-border: rgba(15, 23, 42, 0.08);
+  --portal-header-bg: rgba(255, 255, 255, 0.88);
+  --portal-shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.05);
+  --portal-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  --portal-sidebar-bg: #fcfcfd;
+  --portal-sidebar-text: #475569;
+  --portal-sidebar-title: #0f172a;
+  --portal-sidebar-muted: #94a3b8;
+  --portal-sidebar-border: rgba(15, 23, 42, 0.08);
+  --portal-sidebar-card: rgba(255, 255, 255, 0.88);
+  --portal-sidebar-hover: rgba(15, 23, 42, 0.04);
+  --portal-sidebar-active: rgba(185, 28, 28, 0.06);
+  --portal-sidebar-icon-bg: rgba(15, 23, 42, 0.05);
 }
 
 * {
@@ -65,6 +84,25 @@ body.body--dark {
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --portal-bg: #090f1a;
+  --portal-bg-accent:
+    radial-gradient(circle at 0% 0%, rgba(185, 28, 28, 0.08), transparent 34%),
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.1), transparent 28%);
+  --portal-surface: #111827;
+  --portal-surface-muted: #0f172a;
+  --portal-border: rgba(148, 163, 184, 0.14);
+  --portal-header-bg: rgba(9, 15, 26, 0.9);
+  --portal-shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.22);
+  --portal-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --portal-sidebar-bg: #0b1220;
+  --portal-sidebar-text: #cbd5e1;
+  --portal-sidebar-title: #f8fafc;
+  --portal-sidebar-muted: #64748b;
+  --portal-sidebar-border: rgba(148, 163, 184, 0.12);
+  --portal-sidebar-card: rgba(255, 255, 255, 0.03);
+  --portal-sidebar-hover: rgba(255, 255, 255, 0.04);
+  --portal-sidebar-active: rgba(185, 28, 28, 0.12);
+  --portal-sidebar-icon-bg: rgba(255, 255, 255, 0.05);
 }
 
 .q-field--outlined .q-field__control {
@@ -1255,3 +1293,5 @@ body.body--dark .action-bar {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+@import 'portal.scss';

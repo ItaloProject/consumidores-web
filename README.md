@@ -8,12 +8,27 @@ Plataforma de formulários digitais da CGB Engenharia, desenvolvida com **Bun** 
 
 ## Requisitos
 
-- [Bun](https://bun.sh/) 1.x
+- **Node.js 22.22.0 ou superior** (obrigatório para `@quasar/app-vite`)
+- [Bun](https://bun.sh/) 1.x (opcional)
+
+Se usar [nvm](https://github.com/nvm-sh/nvm):
+
+```bash
+nvm install
+nvm use
+node -v   # deve mostrar v22.22.x ou superior
+```
 
 ## Como executar
 
 ```bash
-cd consumidores-web
+npm install
+npm run dev -- --port 9000
+```
+
+Ou com Bun:
+
+```bash
 bun install
 bun run dev
 ```

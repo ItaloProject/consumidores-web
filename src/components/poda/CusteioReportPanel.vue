@@ -26,36 +26,54 @@
             <q-select
               v-model="cabecalho.base"
               :options="baseOptions"
-              label="Base"
+              label="Base *"
               outlined
               dense
               emit-value
               map-options
               hide-bottom-space
-              clearable
+              :error="validacaoAtiva && !cabecalho.base"
+              error-message="Informe a base"
             />
           </div>
           <div class="col-12 col-md-3">
             <q-select
               v-model="cabecalho.municipio"
               :options="municipioOptionsFiltered"
-              label="Município"
+              label="Município *"
               outlined
               dense
               hide-bottom-space
-              clearable
               use-input
               fill-input
               hide-selected
               input-debounce="0"
+              :error="validacaoAtiva && !cabecalho.municipio.trim()"
+              error-message="Informe o município"
               @filter="filterMunicipios"
             />
           </div>
           <div class="col-12 col-md-3">
-            <q-input v-model="cabecalho.ordemIncidente" label="Ordem / Incidente" outlined dense hide-bottom-space />
+            <q-input
+              v-model="cabecalho.ordemIncidente"
+              label="Ordem / Incidente *"
+              outlined
+              dense
+              hide-bottom-space
+              :error="validacaoAtiva && !cabecalho.ordemIncidente.trim()"
+              error-message="Informe a ordem / incidente"
+            />
           </div>
           <div class="col-12 col-md-3">
-            <q-input v-model="cabecalho.componenteOuPg" label="Componente ou PG" outlined dense hide-bottom-space />
+            <q-input
+              v-model="cabecalho.componenteOuPg"
+              label="Componente ou PG *"
+              outlined
+              dense
+              hide-bottom-space
+              :error="validacaoAtiva && !cabecalho.componenteOuPg.trim()"
+              error-message="Informe o componente ou PG"
+            />
           </div>
           <div class="col-12">
             <q-input
@@ -250,6 +268,7 @@ import { storeToRefs } from 'pinia';
 import { useCusteioStore, servicoPreenchido } from 'src/stores/custeio';
 import type { CusteioServico } from 'src/stores/custeio';
 import { exportCusteioToPdf } from 'src/utils/custeio-pdf';
+import { validateCusteioCabecalho } from 'src/utils/custeio-helpers';
 import { formatDistritalLabel } from 'src/utils/arrasto-helpers';
 import distritaisData from 'src/data/arrasto-distritais.json';
 import municipiosMaranhaoData from 'src/data/municipios-maranhao.json';
@@ -466,6 +485,18 @@ function handleDrop(s: CusteioServico, tipo: Tipo, event: DragEvent) {
 
 function ensureExportavel(): boolean {
   validacaoAtiva.value = true;
+
+  const cabecalhoErrors = validateCusteioCabecalho(cabecalho.value);
+  if (cabecalhoErrors.length > 0) {
+    $q.notify({
+      type: 'negative',
+      icon: 'warning',
+      message: cabecalhoErrors[0],
+      timeout: 5000,
+    });
+    return false;
+  }
+
   if (preenchidosCount.value === 0) {
     $q.notify({
       type: 'negative',

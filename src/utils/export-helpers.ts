@@ -26,18 +26,23 @@ export function buildDesligamentoExportFileName(
 }
 
 export function buildArrastoExportFileName(obra: ArrastoObra, extension: 'xlsm' | 'pdf' = 'xlsm'): string {
-  const pep = sanitizeFileNamePart(obra.pep) || 'arrasto';
-  return `MEMÓRIA DE CÁLCULO ARRASTO - ${pep}.${extension}`;
+  const pep = sanitizePepForFileName(obra.pep) || 'arrasto';
+  return `MEMÓRIA DE CÁLCULO ARRASTO DE MATERIAIS - ${pep}.${extension}`;
 }
 
 export function buildCalcadaExportFileName(obra: CalcadaObra, extension: 'xlsx' | 'pdf'): string {
-  const pep = sanitizeFileNamePart(obra.pep) || 'calcada';
-  return `ANEXO REPARO DE CALÇADA - ${pep}.${extension}`;
+  const pep = sanitizePepForFileName(obra.pep) || 'calcada';
+  return `FORMULÁRIO REPARO DE CALÇADA - ${pep}.${extension}`;
 }
 
 export function buildCusteioExportFileName(cabecalho: { componenteOuPg?: string; municipio?: string }, extension: 'xlsx' | 'pdf'): string {
   const ref = sanitizeFileNamePart(cabecalho.componenteOuPg || cabecalho.municipio || '') || 'custeio';
   return `RELATORIO_CUSTEIO - ${ref}.${extension}`;
+}
+
+export function buildPodaExportFileName(cabecalho: { pep?: string }, extension: 'pdf' = 'pdf'): string {
+  const pep = sanitizePepForFileName(cabecalho.pep ?? '') || 'poda';
+  return `RELATÓRIO DE PODAS - ${pep}.${extension}`;
 }
 
 export function buildCadastroExportFileName(form: CadastroForm, extension: 'xlsx' | 'pdf' = 'xlsx'): string {

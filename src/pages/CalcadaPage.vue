@@ -35,33 +35,38 @@
                 :error="validacaoAtiva && !obra.pep.trim()" error-message="Informe o PEP" />
             </div>
             <div class="col-12 col-md-4">
-              <q-input v-model="obra.nota" label="Nota" outlined dense hide-bottom-space />
+              <q-input v-model="obra.nota" label="Nota *" outlined dense hide-bottom-space
+                :error="validacaoAtiva && !obra.nota.trim()" error-message="Informe a nota" />
             </div>
             <div class="col-12 col-md-4">
-              <q-select v-model="obra.distrital" :options="distritalOptions" label="Distrital"
-                outlined dense emit-value map-options hide-bottom-space clearable />
+              <q-select v-model="obra.distrital" :options="distritalOptions" label="Distrital *"
+                outlined dense emit-value map-options hide-bottom-space
+                :error="validacaoAtiva && !obra.distrital" error-message="Informe o distrital" />
             </div>
             <div class="col-12 col-md-8">
               <q-input v-model="obra.descricaoObra" label="Descrição da Obra *" outlined dense hide-bottom-space
                 :error="validacaoAtiva && !obra.descricaoObra.trim()" error-message="Informe a descrição" />
             </div>
             <div class="col-12 col-md-4">
-              <q-input v-model="obra.municipio" label="Município / Cidade" outlined dense hide-bottom-space />
+              <q-input v-model="obra.municipio" label="MUNICIPIO *" outlined dense hide-bottom-space
+                :error="validacaoAtiva && !obra.municipio.trim()" error-message="Informe o município" />
             </div>
           </div>
 
           <!-- Campos calculados -->
           <div class="row q-col-gutter-md q-mt-xs items-center">
             <div class="col-6 col-md-2">
-              <div class="calc-field">
-                <span class="calc-field__label">PI</span>
+              <div class="calc-field" :class="{ 'calc-field--error': validacaoAtiva && !pi }">
+                <span class="calc-field__label">PI *</span>
                 <span class="calc-field__value">{{ pi || '—' }}</span>
+                <span v-if="validacaoAtiva && !pi" class="calc-field__error">PEP inválido</span>
               </div>
             </div>
             <div class="col-6 col-md-2">
-              <div class="calc-field">
-                <span class="calc-field__label">Setor</span>
+              <div class="calc-field" :class="{ 'calc-field--error': validacaoAtiva && !setor }">
+                <span class="calc-field__label">Setor *</span>
                 <span class="calc-field__value">{{ setor || '—' }}</span>
+                <span v-if="validacaoAtiva && !setor" class="calc-field__error">PEP inválido</span>
               </div>
             </div>
           </div>
@@ -79,8 +84,11 @@
         <q-card-section class="premium-card__body">
           <div class="row q-col-gutter-md items-center">
             <div class="col-12 col-md-4">
-              <q-input v-model.number="obra.quantidade" type="number" min="0" step="0.01"
-                label="Quantidade" outlined dense hide-bottom-space />
+              <q-input v-model.number="obra.quantidade" type="number" min="1" step="1"
+                label="Quantidade *" outlined dense hide-bottom-space
+                hint="Define quantas evidências (PG + fotos Antes/Depois) são obrigatórias"
+                :error="validacaoAtiva && (obra.quantidade == null || obra.quantidade <= 0)"
+                error-message="Informe a quantidade de reparos" />
             </div>
             <div class="col-12 col-md-4">
               <q-input v-model.number="obra.valorSap" type="number" min="0" step="0.01"
@@ -119,7 +127,10 @@
       <div class="action-bar q-mb-md">
         <div class="stat-chip">
           <q-icon name="check_circle" size="18px" color="primary" />
-          <strong>{{ preenchidasCount }}</strong> evidência(s) preenchida(s)
+          <strong>{{ completasCount }}</strong> de <strong>{{ evidenciasRequeridas }}</strong> evidência(s) completa(s)
+        </div>
+        <div class="text-caption text-grey-7 q-ml-sm">
+          Cada evidência exige PG, foto Antes e foto Depois.
         </div>
       </div>
 
@@ -128,19 +139,41 @@
           v-for="(ev, idx) in evidencias"
           :key="ev.id"
           class="servico-card"
-          :class="{ 'servico-card--ok': evidenciaPreenchida(ev) }"
+          :class="{
+            'servico-card--ok': evidenciaCompleta(ev),
+            'servico-card--invalid': evidenciaInvalida(ev, idx),
+          }"
         >
           <div class="servico-card__header">
             <div class="servico-card__header-left">
               <span class="servico-card__badge">{{ ev.id }}</span>
               <span class="servico-card__title">Evidência {{ ev.id }}</span>
-              <q-icon v-if="evidenciaPreenchida(ev)" name="check_circle" size="16px" color="positive" class="q-ml-xs" />
+              <q-icon v-if="evidenciaCompleta(ev)" name="check_circle" size="16px" color="positive" class="q-ml-xs" />
             </div>
             <div class="row items-center q-gutter-sm">
-              <q-input v-model="ev.pg" label="PG" dense outlined hide-bottom-space class="pg-input" />
-              <q-btn flat round dense icon="delete_outline" color="negative" size="sm"
-                :disable="evidencias.length <= 1" @click="removeEvidencia(idx)">
-                <q-tooltip>Remover evidência</q-tooltip>
+              <q-input
+                v-model="ev.pg"
+                label="PG *"
+                dense
+                outlined
+                hide-bottom-space
+                class="pg-input"
+                :error="evidenciaInvalida(ev, idx) && !ev.pg.trim()"
+                error-message="Obrigatório"
+              />
+              <q-btn
+                flat
+                round
+                dense
+                icon="delete_outline"
+                color="negative"
+                size="sm"
+                :disable="!podeRemoverEvidencia(idx)"
+                @click="removeEvidencia(idx)"
+              >
+                <q-tooltip>
+                  {{ podeRemoverEvidencia(idx) ? 'Remover evidência' : 'Quantidade exige esta evidência' }}
+                </q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -151,22 +184,72 @@
               <div class="foto-slot__label">
                 <q-icon name="history" size="14px" /> Antes
               </div>
-              <PhotoCell
-                :value="ev.fotoAntes"
-                :selected="isSelected(ev, 'antes')"
-                :drop-target="isDropTarget(ev, 'antes')"
-                :dragging="isDragging(ev, 'antes')"
-                @select="selectCell(ev, 'antes', $event)"
+
+              <div
+                v-if="ev.fotoAntes"
+                class="evidencia-zone evidencia-zone--filled relative-position"
+                :class="cellClass(ev, 'antes')"
+                tabindex="0"
+                title="Arraste a imagem para outro quadrado ou cole com Ctrl+V"
+                @click="selectCell(ev, 'antes', $event)"
                 @paste="handleZonePaste($event, ev, 'antes')"
-                @pick="triggerFoto(idx, 'antes')"
-                @clear="ev.fotoAntes = ''"
-                @dragstart="handleDragStart(ev, 'antes', $event)"
-                @dragend="handleDragEnd"
                 @dragover="handleDragOver(ev, 'antes', $event)"
                 @drop="handleDrop(ev, 'antes', $event)"
+              >
+                <img
+                  :src="ev.fotoAntes"
+                  draggable="true"
+                  class="evidencia-img evidencia-img--draggable"
+                  style="width:100%; max-height:260px; object-fit:contain; border-radius:8px;"
+                  @dragstart="handleDragStart(ev, 'antes', $event)"
+                  @dragend="handleDragEnd"
+                />
+                <q-btn
+                  icon="close"
+                  round
+                  dense
+                  size="sm"
+                  color="negative"
+                  class="foto-slot__clear-btn absolute-top-right q-ma-xs"
+                  @click.stop="ev.fotoAntes = ''"
+                >
+                  <q-tooltip>Apagar foto</q-tooltip>
+                </q-btn>
+              </div>
+
+              <div
+                v-else
+                class="evidencia-zone evidencia-zone--empty flex flex-center column"
+                :class="cellClass(ev, 'antes')"
+                tabindex="0"
+                title="Selecione o quadrado, cole com Ctrl+V ou solte uma imagem arrastada"
+                @click="selectCell(ev, 'antes', $event)"
+                @paste="handleZonePaste($event, ev, 'antes')"
+                @keydown.enter="triggerFoto(idx, 'antes')"
+                @dragover="handleDragOver(ev, 'antes', $event)"
+                @drop="handleDrop(ev, 'antes', $event)"
+              >
+                <button
+                  type="button"
+                  class="evidencia-zone__upload-trigger"
+                  aria-label="Anexar imagem"
+                  @click.stop="triggerFoto(idx, 'antes')"
+                >
+                  <q-icon name="add_photo_alternate" size="40px" color="grey-5" />
+                  <span class="text-grey-6 text-caption">Clique para anexar</span>
+                </button>
+                <span class="evidencia-zone__paste-hint text-grey-6 text-caption">
+                  ou selecione, cole (Ctrl+V) ou arraste
+                </span>
+              </div>
+
+              <input
+                :ref="(el) => setFotoRef(el, idx, 'antes')"
+                type="file"
+                accept="image/*"
+                style="display:none"
+                @change="(e) => handleFotoChange(e, ev, 'antes')"
               />
-              <input :ref="(el) => setFotoRef(el, idx, 'antes')" type="file" accept="image/*"
-                style="display:none" @change="(e) => handleFotoChange(e, ev, 'antes')" />
             </div>
 
             <div class="foto-slot__divider" />
@@ -176,113 +259,97 @@
               <div class="foto-slot__label">
                 <q-icon name="update" size="14px" /> Depois
               </div>
-              <PhotoCell
-                :value="ev.fotoDepois"
-                :selected="isSelected(ev, 'depois')"
-                :drop-target="isDropTarget(ev, 'depois')"
-                :dragging="isDragging(ev, 'depois')"
-                @select="selectCell(ev, 'depois', $event)"
+
+              <div
+                v-if="ev.fotoDepois"
+                class="evidencia-zone evidencia-zone--filled relative-position"
+                :class="cellClass(ev, 'depois')"
+                tabindex="0"
+                title="Arraste a imagem para outro quadrado ou cole com Ctrl+V"
+                @click="selectCell(ev, 'depois', $event)"
                 @paste="handleZonePaste($event, ev, 'depois')"
-                @pick="triggerFoto(idx, 'depois')"
-                @clear="ev.fotoDepois = ''"
-                @dragstart="handleDragStart(ev, 'depois', $event)"
-                @dragend="handleDragEnd"
                 @dragover="handleDragOver(ev, 'depois', $event)"
                 @drop="handleDrop(ev, 'depois', $event)"
+              >
+                <img
+                  :src="ev.fotoDepois"
+                  draggable="true"
+                  class="evidencia-img evidencia-img--draggable"
+                  style="width:100%; max-height:260px; object-fit:contain; border-radius:8px;"
+                  @dragstart="handleDragStart(ev, 'depois', $event)"
+                  @dragend="handleDragEnd"
+                />
+                <q-btn
+                  icon="close"
+                  round
+                  dense
+                  size="sm"
+                  color="negative"
+                  class="foto-slot__clear-btn absolute-top-right q-ma-xs"
+                  @click.stop="ev.fotoDepois = ''"
+                >
+                  <q-tooltip>Apagar foto</q-tooltip>
+                </q-btn>
+              </div>
+
+              <div
+                v-else
+                class="evidencia-zone evidencia-zone--empty flex flex-center column"
+                :class="cellClass(ev, 'depois')"
+                tabindex="0"
+                title="Selecione o quadrado, cole com Ctrl+V ou solte uma imagem arrastada"
+                @click="selectCell(ev, 'depois', $event)"
+                @paste="handleZonePaste($event, ev, 'depois')"
+                @keydown.enter="triggerFoto(idx, 'depois')"
+                @dragover="handleDragOver(ev, 'depois', $event)"
+                @drop="handleDrop(ev, 'depois', $event)"
+              >
+                <button
+                  type="button"
+                  class="evidencia-zone__upload-trigger"
+                  aria-label="Anexar imagem"
+                  @click.stop="triggerFoto(idx, 'depois')"
+                >
+                  <q-icon name="add_photo_alternate" size="40px" color="grey-5" />
+                  <span class="text-grey-6 text-caption">Clique para anexar</span>
+                </button>
+                <span class="evidencia-zone__paste-hint text-grey-6 text-caption">
+                  ou selecione, cole (Ctrl+V) ou arraste
+                </span>
+              </div>
+
+              <input
+                :ref="(el) => setFotoRef(el, idx, 'depois')"
+                type="file"
+                accept="image/*"
+                style="display:none"
+                @change="(e) => handleFotoChange(e, ev, 'depois')"
               />
-              <input :ref="(el) => setFotoRef(el, idx, 'depois')" type="file" accept="image/*"
-                style="display:none" @change="(e) => handleFotoChange(e, ev, 'depois')" />
             </div>
           </div>
         </div>
 
-        <button class="servicos-add-btn" @click="addEvidencia">
-          <q-icon name="add_circle_outline" size="20px" />
-          Adicionar evidência
-        </button>
       </div>
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, h, resolveComponent, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { storeToRefs } from 'pinia';
-import { useCalcadaStore, evidenciaPreenchida } from 'src/stores/calcada';
+import { useCalcadaStore } from 'src/stores/calcada';
 import type { CalcadaEvidencia } from 'src/stores/calcada';
-import { calcularPi, calcularSetor, calcularValorRs, formatBRL } from 'src/utils/calcada-helpers';
+import { calcularPi, calcularSetor, calcularValorRs, formatBRL, evidenciaCompleta, quantidadeEvidenciasRequeridas, validateCalcadaEvidencias, validateCalcadaObra } from 'src/utils/calcada-helpers';
 import { exportCalcadaToPdf } from 'src/utils/calcada-pdf';
 import { formatDistritalLabel } from 'src/utils/arrasto-helpers';
 import distritaisData from 'src/data/arrasto-distritais.json';
 import { setProtectedDefault } from 'src/utils/protected-defaults';
 
-// ── Componente inline de célula de foto (idêntico ao Desligamento) ───────────
-const PhotoCell = (props: {
-  value: string; selected: boolean; dropTarget: boolean; dragging: boolean;
-}, { emit }: { emit: (e: string, ...args: unknown[]) => void }) => {
-  const QBtn = resolveComponent('QBtn');
-  const QIcon = resolveComponent('QIcon');
-
-  const cls = [
-    'evidencia-zone',
-    props.value ? 'evidencia-zone--filled relative-position' : 'evidencia-zone--empty flex flex-center column',
-    {
-      'evidencia-zone--selected': props.selected,
-      'evidencia-zone--drop-target': props.dropTarget,
-      'evidencia-zone--dragging': props.dragging,
-    },
-  ];
-
-  const baseAttrs = {
-    class: cls,
-    tabindex: '0',
-    onClick: (e: Event) => emit('select', e),
-    onPaste: (e: Event) => emit('paste', e),
-    onDragover: (e: Event) => emit('dragover', e),
-    onDrop: (e: Event) => emit('drop', e),
-  };
-
-  if (props.value) {
-    return h('div', { ...baseAttrs, title: 'Arraste a imagem para outro quadrado ou cole com Ctrl+V' }, [
-      h('img', {
-        src: props.value,
-        draggable: 'true',
-        class: 'evidencia-img evidencia-img--draggable',
-        style: 'width:100%; max-height:260px; object-fit:contain; border-radius:8px;',
-        onDragstart: (e: Event) => emit('dragstart', e),
-        onDragend: () => emit('dragend'),
-      }),
-      h(QBtn, {
-        icon: 'close',
-        round: true,
-        dense: true,
-        size: 'sm',
-        color: 'negative',
-        class: 'absolute-top-right q-ma-xs',
-        onClick: (e: MouseEvent) => { e.stopPropagation(); emit('clear'); },
-      }),
-    ]);
-  }
-
-  return h('div', { ...baseAttrs, title: 'Selecione o quadrado, cole com Ctrl+V ou solte uma imagem arrastada' }, [
-    h('button', {
-      type: 'button',
-      class: 'evidencia-zone__upload-trigger',
-      'aria-label': 'Anexar imagem',
-      onClick: (e: MouseEvent) => { e.stopPropagation(); emit('pick'); },
-    }, [
-      h(QIcon, { name: 'add_photo_alternate', size: '40px', color: 'grey-5' }),
-      h('span', { class: 'text-grey-6 text-caption' }, 'Clique para anexar'),
-    ]),
-    h('span', { class: 'evidencia-zone__paste-hint text-grey-6 text-caption' }, 'ou selecione, cole (Ctrl+V) ou arraste'),
-  ]);
-};
-
 const $q = useQuasar();
 const store = useCalcadaStore();
 const { obra, evidencias } = storeToRefs(store);
-const { addEvidencia, removeEvidencia, resetForm } = store;
+const { removeEvidencia, resetForm, syncEvidenciasComQuantidade } = store;
 
 const validacaoAtiva = ref(false);
 const valorSapLiberado = ref(false);
@@ -297,6 +364,13 @@ watch(
   },
 );
 
+watch(
+  () => obra.value.quantidade,
+  () => {
+    syncEvidenciasComQuantidade();
+  },
+);
+
 const distritalOptions = (distritaisData as string[]).map((value) => ({
   label: formatDistritalLabel(value),
   value,
@@ -305,7 +379,21 @@ const distritalOptions = (distritaisData as string[]).map((value) => ({
 const pi = computed(() => calcularPi(obra.value.pep));
 const setor = computed(() => calcularSetor(obra.value.pep));
 const valorRsFmt = computed(() => formatBRL(calcularValorRs(obra.value.quantidade, obra.value.valorSap)));
-const preenchidasCount = computed(() => evidencias.value.filter(evidenciaPreenchida).length);
+const evidenciasRequeridas = computed(() => quantidadeEvidenciasRequeridas(obra.value.quantidade));
+const completasCount = computed(() => evidencias.value.filter(evidenciaCompleta).length);
+
+function evidenciaObrigatoria(idx: number) {
+  return idx < evidenciasRequeridas.value;
+}
+
+function evidenciaInvalida(ev: CalcadaEvidencia, idx: number) {
+  return validacaoAtiva.value && evidenciaObrigatoria(idx) && !evidenciaCompleta(ev);
+}
+
+function podeRemoverEvidencia(idx: number) {
+  if (evidencias.value.length <= evidenciasRequeridas.value) return false;
+  return idx >= evidenciasRequeridas.value;
+}
 
 // ── Chave de célula ───────────────────────────────────────────────────────────
 type Tipo = 'antes' | 'depois';
@@ -316,9 +404,15 @@ const draggedKey = ref<CellKey | null>(null);
 const dropTargetKey = ref<CellKey | null>(null);
 
 function eq(a: CellKey | null, b: CellKey) { return !!a && a.id === b.id && a.tipo === b.tipo; }
-function isSelected(e: CalcadaEvidencia, t: Tipo) { return eq(selectedKey.value, { id: e.id, tipo: t }); }
-function isDropTarget(e: CalcadaEvidencia, t: Tipo) { return eq(dropTargetKey.value, { id: e.id, tipo: t }); }
-function isDragging(e: CalcadaEvidencia, t: Tipo) { return eq(draggedKey.value, { id: e.id, tipo: t }); }
+
+function cellClass(e: CalcadaEvidencia, t: Tipo) {
+  const k = { id: e.id, tipo: t };
+  return {
+    'evidencia-zone--selected': eq(selectedKey.value, k),
+    'evidencia-zone--drop-target': eq(dropTargetKey.value, k),
+    'evidencia-zone--dragging': eq(draggedKey.value, k),
+  };
+}
 
 function getPhoto(e: CalcadaEvidencia, t: Tipo) { return t === 'antes' ? e.fotoAntes : e.fotoDepois; }
 function setPhoto(e: CalcadaEvidencia, t: Tipo, v: string) {
@@ -409,7 +503,10 @@ async function handleGlobalPaste(event: ClipboardEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('paste', handleGlobalPaste));
+onMounted(() => {
+  document.addEventListener('paste', handleGlobalPaste);
+  syncEvidenciasComQuantidade();
+});
 onUnmounted(() => document.removeEventListener('paste', handleGlobalPaste));
 
 // ── Drag & drop ───────────────────────────────────────────────────────────────
@@ -455,14 +552,20 @@ function handleDrop(e: CalcadaEvidencia, t: Tipo, event: Event) {
 // ── Validação e exportação ────────────────────────────────────────────────────
 function ensureExportavel(): boolean {
   validacaoAtiva.value = true;
-  if (!obra.value.pep.trim() || !obra.value.descricaoObra.trim()) {
-    $q.notify({ type: 'negative', icon: 'warning', message: 'Preencha o PEP e a descrição da obra.' });
+  syncEvidenciasComQuantidade();
+
+  const obraErrors = validateCalcadaObra(obra.value);
+  if (obraErrors.length > 0) {
+    $q.notify({ type: 'negative', icon: 'warning', message: obraErrors[0] });
     return false;
   }
-  if (preenchidasCount.value === 0) {
-    $q.notify({ type: 'negative', icon: 'photo_camera', message: 'Adicione pelo menos 1 evidência com foto.' });
+
+  const evidenciaErrors = validateCalcadaEvidencias(obra.value, evidencias.value);
+  if (evidenciaErrors.length > 0) {
+    $q.notify({ type: 'negative', icon: 'photo_camera', message: evidenciaErrors[0] });
     return false;
   }
+
   return true;
 }
 
@@ -551,6 +654,17 @@ function solicitarSenhaValorSap() {
   background: rgba(var(--q-primary-rgb, 25, 118, 210), 0.06);
 }
 
+.calc-field--error {
+  border-color: var(--q-negative) !important;
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.calc-field__error {
+  font-size: 10px;
+  color: var(--q-negative);
+  font-weight: 600;
+}
+
 .calc-field__label {
   font-size: 10px;
   font-weight: 700;
@@ -577,6 +691,7 @@ function solicitarSenhaValorSap() {
 
 .body--dark .servico-card { border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); }
 .servico-card--ok { border-color: rgba(76, 175, 80, 0.35); }
+.servico-card--invalid { border-color: rgba(239, 68, 68, 0.45); }
 
 .servico-card__header {
   display: flex; align-items: center; justify-content: space-between;
@@ -613,6 +728,10 @@ function solicitarSenhaValorSap() {
 }
 
 :deep(.evidencia-zone--empty) { height: 260px; }
+
+.foto-slot__clear-btn {
+  z-index: 1;
+}
 
 .servicos-add-btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;

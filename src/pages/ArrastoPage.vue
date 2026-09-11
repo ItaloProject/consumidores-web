@@ -405,6 +405,7 @@ import {
   validateArrastoParaExportacao,
 } from 'src/utils/arrasto-helpers';
 import type { ArrastoMaterial } from 'src/utils/arrasto-types';
+import { PROTECTED_FIELDS_PASSWORD } from 'src/config/protected-fields';
 import { setProtectedDefault } from 'src/utils/protected-defaults';
 
 const $q = useQuasar();
@@ -416,7 +417,7 @@ const abaAtiva = ref<'sintese' | 'materiais'>('materiais');
 const filtroMateriais = ref('');
 const validacaoAtiva = ref(false);
 const precoUnitarioLiberado = ref(false);
-const PRECO_UNITARIO_SENHA = 'CGB123';
+const PRECO_UNITARIO_SENHA = PROTECTED_FIELDS_PASSWORD;
 
 watch(
   () => precoUnitario.value,

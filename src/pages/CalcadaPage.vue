@@ -359,6 +359,7 @@ import { exportCalcadaToPdf } from 'src/utils/calcada-pdf';
 import { formatDistritalLabel } from 'src/utils/arrasto-helpers';
 import distritaisData from 'src/data/arrasto-distritais.json';
 import municipiosMaranhaoData from 'src/data/municipios-maranhao.json';
+import { PROTECTED_FIELDS_PASSWORD } from 'src/config/protected-fields';
 import { setProtectedDefault } from 'src/utils/protected-defaults';
 
 const $q = useQuasar();
@@ -385,7 +386,7 @@ function filterMunicipios(val: string, update: (callback: () => void) => void) {
   });
 }
 
-const VALOR_SAP_SENHA = 'CGB123';
+const VALOR_SAP_SENHA = PROTECTED_FIELDS_PASSWORD;
 
 watch(
   () => obra.value.valorSap,

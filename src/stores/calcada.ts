@@ -67,7 +67,11 @@ function loadPersistedState(): CalcadaPersistedState | null {
       : Array.from({ length: 1 }, (_, i) => createEmptyEvidencia(i + 1));
 
     return {
-      obra: { ...createDefaultObra(), ...parsed.obra },
+      obra: {
+        ...createDefaultObra(),
+        ...parsed.obra,
+        valorSap: createDefaultObra().valorSap,
+      },
       evidencias,
     };
   } catch {

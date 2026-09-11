@@ -48,10 +48,13 @@ function loadPersistedState(): ArrastoPersistedState | null {
         typeof parsed.arrastoEmM === 'number' && !Number.isNaN(parsed.arrastoEmM)
           ? parsed.arrastoEmM
           : null,
-      precoUnitario:
+      precoUnitario: getProtectedDefault(
+        'arrasto',
+        'precoUnitario',
         typeof parsed.precoUnitario === 'number' && !Number.isNaN(parsed.precoUnitario)
           ? parsed.precoUnitario
-          : getProtectedDefault('arrasto', 'precoUnitario', PRECO_UNITARIO_PADRAO),
+          : PRECO_UNITARIO_PADRAO,
+      ),
       quantidades: parsed.quantidades ?? {},
       evidencias: Array.isArray(parsed.evidencias)
         ? Array.from({ length: 8 }, (_, index) => parsed.evidencias?.[index] ?? null)
@@ -80,7 +83,11 @@ export const useArrastoStore = defineStore('arrasto', () => {
   const obra = ref<ArrastoObra>(persisted?.obra ?? createDefaultObra());
   const arrastoEmM = ref<number | null>(persisted?.arrastoEmM ?? null);
   const precoUnitario = ref(
-    persisted?.precoUnitario ?? getProtectedDefault('arrasto', 'precoUnitario', PRECO_UNITARIO_PADRAO),
+    getProtectedDefault(
+      'arrasto',
+      'precoUnitario',
+      persisted?.precoUnitario ?? PRECO_UNITARIO_PADRAO,
+    ),
   );
   const quantidades = ref<Record<number, number>>(persisted?.quantidades ?? {});
   const evidencias = ref<(string | null)[]>(persisted?.evidencias ?? Array(8).fill(null));

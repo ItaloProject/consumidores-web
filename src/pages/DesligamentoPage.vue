@@ -551,6 +551,7 @@ import {
 } from 'src/utils/desligamento-helpers';
 import { exportDesligamentoToPdf } from 'src/utils/desligamento-pdf';
 import municipiosMaranhaoData from 'src/data/municipios-maranhao.json';
+import { PROTECTED_FIELDS_PASSWORD } from 'src/config/protected-fields';
 import { setProtectedDefault } from 'src/utils/protected-defaults';
 
 const $q = useQuasar();
@@ -584,7 +585,7 @@ const siPdfInput = ref<HTMLInputElement | null>(null);
 const siDate = ref('');
 const desligamentoValidacaoAtiva = ref(false);
 const valoresUnitariosLiberados = ref(false);
-const VALORES_UNITARIOS_SENHA = 'CGB123';
+const VALORES_UNITARIOS_SENHA = PROTECTED_FIELDS_PASSWORD;
 
 watch(
   () => solicitacao.value.valorUnitarioSemProtocolo,

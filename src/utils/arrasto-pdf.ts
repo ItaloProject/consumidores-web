@@ -16,6 +16,7 @@ import type { ArrastoMaterial } from './arrasto-types';
 import { publicAsset } from './assets';
 import { buildArrastoExportFileName } from './export-helpers';
 import { savePdfWithWatermark } from './pdf-watermark';
+import { compressImage, photoQuality } from './compress-image';
 
 const CGB_LOGO_URL = publicAsset('template/cgb-logo.png');
 
@@ -39,21 +40,21 @@ const yOff = NEW_Y0 - ORIG_Y0;
 const tx = (x: number) => NEW_X0 + (x - ORIG_X0) * xScale;
 const ty = (y: number) => y + yOff;
 
-const MATERIAIS_COL_RATIOS = [76, 51, 139, 166, 41, 50, 47, 42, 37];
+// Coluna1 removida; seus 37pt redistribuídos para DESCRIÇÃO
+const MATERIAIS_COL_RATIOS = [76, 51, 139, 203, 41, 50, 47, 42];
 const MATERIAIS_COL_HEADERS = [
-  'FAMILIA',
+  'FAMÍLIA',
   'TIPO',
   'MATERIAL',
-  'DESC_MATERIAL',
+  'DESCRIÇÃO',
   'UMB',
   'PESO',
   'QTD',
   'TOTAL',
-  'Coluna1',
 ] as const;
 
 const EV_START = ty(187);
-const PAGE_BOTTOM = 830;
+const PAGE_BOTTOM = 800; // deixa ~10pt de margem acima do rodapé (watermark em ~810pt)
 const EV_ROWS = 4;
 const EV_H = Math.floor((PAGE_BOTTOM - EV_START) / EV_ROWS);
 
@@ -171,7 +172,10 @@ function drawPageHeader(doc: jsPDF, title: string, logo: string, titleSize = 10)
   });
 
   try {
-    doc.addImage(logo, 'PNG', NEW_X0 + 8, hTop + 4, logoW - 16, hBot - hTop - 8);
+    const logoH = hBot - hTop - 8;
+    const logoW_rendered = logoH * 3.5;
+    const logoCellCenterX = (NEW_X0 + tx(164)) / 2;
+    doc.addImage(logo, 'PNG', logoCellCenterX - logoW_rendered / 2, hTop + 4, logoW_rendered, logoH);
   } catch {
     /* ignore */
   }
@@ -185,12 +189,14 @@ function formatPesoTotalKg(value: number): string {
 
 function buildMateriaisColumnStyles(tableWidth: number) {
   const totalRatio = MATERIAIS_COL_RATIOS.reduce((sum, ratio) => sum + ratio, 0);
-  const styles: Record<number, { cellWidth: number; halign?: 'left' | 'center' }> = {};
+  const styles: Record<number, { cellWidth: number; halign?: 'left' | 'center' | 'right'; fontStyle?: string }> = {};
 
   MATERIAIS_COL_RATIOS.forEach((ratio, index) => {
     styles[index] = {
       cellWidth: (tableWidth * ratio) / totalRatio,
       ...(index === 3 ? { halign: 'left' as const } : {}),
+      ...(index === 5 || index === 7 ? { halign: 'right' as const } : {}),
+      ...(index === 7 ? { fontStyle: 'bold' } : {}),
     };
   });
 
@@ -255,8 +261,8 @@ function drawMateriaisArrastadosPage(
     styles: {
       fontSize: 7,
       cellPadding: 2.5,
-      lineColor: BLACK,
-      lineWidth: 0.4,
+      lineColor: [180, 160, 170] as [number, number, number],
+      lineWidth: 0.3,
       halign: 'center',
       valign: 'middle',
       textColor: RED,
@@ -268,7 +274,12 @@ function drawMateriaisArrastadosPage(
       fontStyle: 'bold',
       halign: 'center',
       fontSize: 7,
-      cellPadding: 3,
+      cellPadding: 3.5,
+      lineColor: [80, 20, 40] as [number, number, number],
+      lineWidth: 0.5,
+    },
+    alternateRowStyles: {
+      fillColor: [252, 245, 248] as [number, number, number],
     },
     head: [Array.from(MATERIAIS_COL_HEADERS)],
     body: materiaisPreenchidos.map(({ material, quantidade, total }) => [
@@ -280,7 +291,6 @@ function drawMateriaisArrastadosPage(
       formatNumeroBr(material.peso),
       String(quantidade),
       formatNumeroBr(total),
-      '',
     ]),
     columnStyles: buildMateriaisColumnStyles(tableWidth),
   });
@@ -306,6 +316,13 @@ export async function exportArrastoToPdf(
   const arrastoEmKm = calcularArrastoEmKm(arrastoEmM);
   const qtdACobrar = calcularQtdACobrar(pesoEmT, arrastoEmKm);
   const valorRs = calcularValorRs(qtdACobrar, precoUnitario);
+
+  const totalEvidencias = evidencias.filter(Boolean).length;
+  const q = photoQuality(totalEvidencias);
+  const compressedEvidencias = await Promise.all(
+    evidencias.map(async (e) => (e ? await compressImage(e, q) : null)),
+  );
+
   const logo = await loadCgbLogoBase64();
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' }) as DocEx;
@@ -428,11 +445,11 @@ export async function exportArrastoToPdf(
 
     vertLabel(doc, lblL_X0, y0, lblL_X1, y1, labels[idxL]!);
     drawCell(doc, lblL_X1, y0, imgL_X1, y1, {});
-    drawEvidImg(doc, evidencias[idxL], lblL_X1, y0, imgL_X1, y1);
+    drawEvidImg(doc, compressedEvidencias[idxL], lblL_X1, y0, imgL_X1, y1);
 
     vertLabel(doc, lblR_X0, y0, lblR_X1, y1, labels[idxR]!);
     drawCell(doc, imgR_X0, y0, NEW_X1, y1, {});
-    drawEvidImg(doc, evidencias[idxR], imgR_X0, y0, NEW_X1, y1);
+    drawEvidImg(doc, compressedEvidencias[idxR], imgR_X0, y0, NEW_X1, y1);
   }
 
   drawMateriaisArrastadosPage(doc, logo, quantidades, materiais, pesoTotalBruto);

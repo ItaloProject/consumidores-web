@@ -21,23 +21,49 @@ export function buildDesligamentoExportFileName(
   obra: DesligamentoObra,
   extension: 'xlsx' | 'pdf',
 ): string {
-  const pep = sanitizeFileNamePart(obra.pep) || 'desligamento';
-  return `AVISO DE DESLIGAMENTO - ${pep}.${extension}`;
+  const pep = sanitizePepForFileName(obra.pep) || 'desligamento';
+  return `FORMULÁRIO AVISO DE DESLIGAMENTO - ${pep}.${extension}`;
 }
 
 export function buildArrastoExportFileName(obra: ArrastoObra, extension: 'xlsm' | 'pdf' = 'xlsm'): string {
-  const pep = sanitizeFileNamePart(obra.pep) || 'arrasto';
-  return `MEMÓRIA DE CÁLCULO ARRASTO - ${pep}.${extension}`;
+  const pep = sanitizePepForFileName(obra.pep) || 'arrasto';
+  return `MEMÓRIA DE CÁLCULO ARRASTO DE MATERIAIS - ${pep}.${extension}`;
 }
 
 export function buildCalcadaExportFileName(obra: CalcadaObra, extension: 'xlsx' | 'pdf'): string {
-  const pep = sanitizeFileNamePart(obra.pep) || 'calcada';
-  return `ANEXO REPARO DE CALÇADA - ${pep}.${extension}`;
+  const pep = sanitizePepForFileName(obra.pep) || 'calcada';
+  return `FORMULÁRIO REPARO DE CALÇADA - ${pep}.${extension}`;
 }
 
-export function buildCusteioExportFileName(cabecalho: { componenteOuPg?: string; municipio?: string }, extension: 'xlsx' | 'pdf'): string {
-  const ref = sanitizeFileNamePart(cabecalho.componenteOuPg || cabecalho.municipio || '') || 'custeio';
-  return `RELATORIO_CUSTEIO - ${ref}.${extension}`;
+function formatDataDiaMes(data: string): string {
+  // DD/MM/YYYY → DD-MM
+  const parts = data.trim().split('/');
+  if (parts.length >= 2 && parts[0] && parts[1]) return `${parts[0]}-${parts[1]}`;
+  return sanitizeFileNamePart(data) || 'DATA';
+}
+
+export function buildCusteioExportFileName(
+  cabecalho: {
+    prefixoEquipe?: string;
+    dataExecucao?: string;
+    tipoOrdem?: 'ordem' | 'incidente';
+    ordemNumero?: string;
+    componenteOuPg?: string;
+  },
+  extension: 'xlsx' | 'pdf',
+): string {
+  const equipe = sanitizeFileNamePart(cabecalho.prefixoEquipe || '') || 'EQUIPE';
+  const data = cabecalho.dataExecucao ? formatDataDiaMes(cabecalho.dataExecucao) : 'DATA';
+  const ref = cabecalho.tipoOrdem === 'incidente'
+    ? `INC ${sanitizeFileNamePart(cabecalho.ordemNumero || '')}`
+    : `CP-${sanitizeFileNamePart(cabecalho.ordemNumero || cabecalho.componenteOuPg || '')}`;
+  return `RELATÓRIO CUSTEIO - ${equipe} - ${data} ${ref}.${extension}`;
+
+}
+
+export function buildPodaExportFileName(cabecalho: { pep?: string }, extension: 'pdf' = 'pdf'): string {
+  const pep = sanitizePepForFileName(cabecalho.pep ?? '') || 'poda';
+  return `RELATÓRIO DE PODAS - ${pep}.${extension}`;
 }
 
 export function buildCadastroExportFileName(form: CadastroForm, extension: 'xlsx' | 'pdf' = 'xlsx'): string {

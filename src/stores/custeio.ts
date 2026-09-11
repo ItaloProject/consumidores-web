@@ -4,15 +4,21 @@ import { ref, watch } from 'vue';
 export interface CusteioCabecalho {
   base: string;
   municipio: string;
-  ordemIncidente: string;
+  tipoOrdem: 'ordem' | 'incidente';
+  ordemNumero: string;
   componenteOuPg: string;
+  prefixoEquipe: string;
+  dataExecucao: string;
   observacao: string;
 }
 
 export interface CusteioServico {
   id: number;
+  atividade: string;
+  quantidade: string;
   fotoInicio: string;
   fotoFim: string;
+  fotosExtras: string[];
 }
 
 const STORAGE_KEY = 'formularios-web:custeio';
@@ -26,18 +32,21 @@ function createDefaultCabecalho(): CusteioCabecalho {
   return {
     base: '',
     municipio: '',
-    ordemIncidente: '',
+    tipoOrdem: 'ordem',
+    ordemNumero: '',
     componenteOuPg: '',
+    prefixoEquipe: '',
+    dataExecucao: '',
     observacao: '',
   };
 }
 
 function createEmptyServico(id: number): CusteioServico {
-  return { id, fotoInicio: '', fotoFim: '' };
+  return { id, atividade: '', quantidade: '', fotoInicio: '', fotoFim: '', fotosExtras: [] };
 }
 
 export function servicoPreenchido(s: CusteioServico): boolean {
-  return !!(s.fotoInicio || s.fotoFim);
+  return !!(s.atividade.trim() || s.quantidade.trim() || s.fotoInicio || s.fotoFim || s.fotosExtras?.some(f => !!f));
 }
 
 function migrateLegacyState(parsed: Record<string, unknown>): CusteioPersistedState | null {
@@ -45,14 +54,7 @@ function migrateLegacyState(parsed: Record<string, unknown>): CusteioPersistedSt
   if (!Array.isArray(evidencias)) return null;
 
   const obra = parsed.obra as Record<string, string> | undefined;
-  const servicos = evidencias.map((item, i) => {
-    const e = item as Record<string, string>;
-    return {
-      id: i + 1,
-      fotoInicio: e.fotoAntes ?? '',
-      fotoFim: e.fotoDepois ?? '',
-    };
-  });
+  const servicos = evidencias.map((_item, i) => createEmptyServico(i + 1));
 
   return {
     cabecalho: {
@@ -80,8 +82,11 @@ function loadPersistedState(): CusteioPersistedState | null {
     const servicos = Array.isArray(parsed.servicos) && parsed.servicos.length > 0
       ? parsed.servicos.map((s, i) => ({
           id: i + 1,
+          atividade: s?.atividade ?? '',
+          quantidade: s?.quantidade ?? '',
           fotoInicio: s?.fotoInicio ?? '',
           fotoFim: s?.fotoFim ?? '',
+          fotosExtras: Array.isArray(s?.fotosExtras) ? s.fotosExtras : [],
         }))
       : Array.from({ length: 5 }, (_, i) => createEmptyServico(i + 1));
 

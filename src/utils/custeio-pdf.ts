@@ -6,6 +6,7 @@ import { publicAsset } from './assets';
 import { buildCusteioExportFileName } from './export-helpers';
 import { formatDistritalLabel } from './arrasto-helpers';
 import { savePdfWithWatermark } from './pdf-watermark';
+import { compressImage, compressAll, photoQuality } from './compress-image';
 
 const BANNER_URL = publicAsset('template/banner.png');
 
@@ -15,12 +16,16 @@ const MX = 8;
 const CONT_W = PAGE_W - MX * 2;
 const PHOTO_W = (CONT_W - 4) / 2;
 const PHOTO_H = PHOTO_W * (9.6 / 12.8);
-const SEC_H = 6 + 6 + PHOTO_H + 4;
+const HEADER_H = 10;
+const REG_H = 5;
+const SEC_H = HEADER_H + REG_H + PHOTO_H + 4;
 
 const LBLUE: [number, number, number] = [189, 215, 238];
 const DBLUE: [number, number, number] = [31, 73, 125];
-const LGRAY: [number, number, number] = [242, 242, 242];
 const GRAY: [number, number, number] = [166, 166, 166];
+const LBLUE_LIGHT: [number, number, number] = [238, 245, 251];
+const MID_BLUE: [number, number, number] = [93, 130, 168];
+const PILL_BLUE: [number, number, number] = [55, 96, 146];
 
 type DocEx = jsPDF & {
   lastAutoTable?: { finalY: number };
@@ -49,19 +54,14 @@ function drawHeader(doc: DocEx, banner: string, cabecalho: CusteioCabecalho, y: 
   doc.text('RELATÓRIO DE EVIDÊNCIAS DOS SERVIÇOS EXECUTADOS', PAGE_W / 2, y + 5.5, { align: 'center' });
   y += 10;
 
+  // Linha 1: BASE | MUNICÍPIO | ORDEM/INCIDENTE | COMPONENTE OU PG
   autoTable(doc, {
     startY: y,
     margin: { left: MX, right: MX },
     tableWidth: CONT_W,
     theme: 'grid',
-    styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', lineColor: GRAY, lineWidth: 0.2 },
-    headStyles: {
-      fillColor: LBLUE,
-      textColor: DBLUE,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 7,
-    },
+    styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', halign: 'center', lineColor: GRAY, lineWidth: 0.2 },
+    headStyles: { fillColor: LBLUE, textColor: DBLUE, fontStyle: 'bold', halign: 'center', fontSize: 7 },
     columnStyles: {
       0: { cellWidth: CONT_W * 0.25 },
       1: { cellWidth: CONT_W * 0.25 },
@@ -72,111 +72,158 @@ function drawHeader(doc: DocEx, banner: string, cabecalho: CusteioCabecalho, y: 
     body: [[
       formatDistritalLabel(cabecalho.base),
       cabecalho.municipio,
-      cabecalho.ordemIncidente,
-      cabecalho.componenteOuPg,
+      cabecalho.tipoOrdem === 'incidente'
+        ? `INC ${cabecalho.ordemNumero || '—'}`
+        : cabecalho.ordemNumero || cabecalho.componenteOuPg || '—',
+      cabecalho.componenteOuPg || '—',
     ]],
   });
 
   y = (doc.lastAutoTable?.finalY ?? y + 8) + 0.5;
 
+  // Linha 2: PREFIXO DA EQUIPE | DATA DE EXECUÇÃO | OBSERVAÇÃO
   autoTable(doc, {
     startY: y,
     margin: { left: MX, right: MX },
     tableWidth: CONT_W,
     theme: 'grid',
-    styles: { fontSize: 6.5, cellPadding: 2, valign: 'top', lineColor: GRAY, lineWidth: 0.2 },
-    headStyles: {
-      fillColor: LBLUE,
-      textColor: DBLUE,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 7,
-    },
-    head: [['OBSERVAÇÃO']],
-    body: [[cabecalho.observacao]],
-  });
-
-  y = (doc.lastAutoTable?.finalY ?? y + 12) + 3;
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MX, right: MX },
-    tableWidth: CONT_W,
-    theme: 'grid',
-    styles: { fontSize: 6.5, cellPadding: 2, valign: 'top', lineColor: GRAY, lineWidth: 0.2 },
-    headStyles: {
-      fillColor: LBLUE,
-      textColor: DBLUE,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 7,
-    },
+    styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', halign: 'center', lineColor: GRAY, lineWidth: 0.2 },
+    headStyles: { fillColor: LBLUE, textColor: DBLUE, fontStyle: 'bold', halign: 'center', fontSize: 7 },
     columnStyles: {
-      0: { cellWidth: CONT_W / 2 },
-      1: { cellWidth: CONT_W / 2 },
+      0: { cellWidth: CONT_W * 0.35 },
+      1: { cellWidth: CONT_W * 0.15 },
+      2: { cellWidth: CONT_W * 0.50 },
     },
-    head: [['OBJETIVO', 'REGISTRO FOTOGRÁFICO']],
+    head: [['PREFIXO DA EQUIPE', 'DATA DE EXECUÇÃO', 'OBSERVAÇÃO']],
     body: [[
-      'Comprovar a execução dos serviços prestados, bem como subsidiar a validação pela empresa contratante - EQTL MA da medição (atividade/quantidade) e a qualidade dos referidos serviços.',
-      'Registro do cenário antes da execução dos serviços e depois para comprovação da execução. Fazer o registro de forma a se obter uma comparação do cenário antes e depois dos serviços prestados.',
+      cabecalho.prefixoEquipe || '—',
+      cabecalho.dataExecucao || '—',
+      cabecalho.observacao || '—',
     ]],
   });
 
-  y = (doc.lastAutoTable?.finalY ?? y + 20) + 3;
-  return y;
+  return (doc.lastAutoTable?.finalY ?? y + 8) + 3;
+}
+
+function drawRegRow(doc: jsPDF, regNum: number, label: string, x: number, y: number) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(...DBLUE);
+  const regStr = `REG.${String(regNum).padStart(3, '0')}`;
+  doc.text(regStr, x + 2, y + 3.3);
+  const w = doc.getTextWidth(regStr);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...MID_BLUE);
+  doc.text(` ${label}`, x + 2 + w, y + 3.3);
+}
+
+function drawPhoto(doc: jsPDF, foto: string, x: number, y: number) {
+  if (foto) {
+    const fmt = foto.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    try { doc.addImage(foto, fmt, x + 0.5, y + 0.5, PHOTO_W - 1, PHOTO_H - 1); }
+    catch { drawPlaceholder(doc, x, y); }
+  } else {
+    drawPlaceholder(doc, x, y);
+  }
 }
 
 function drawEvidencia(
   doc: jsPDF,
   servico: CusteioServico,
-  regInicio: number,
-  regFim: number,
+  regStart: number,
   y: number,
 ): number {
   const xR = MX + PHOTO_W + 4;
+  const atividade = servico.atividade?.trim() || '—';
+  const qtd = servico.quantidade?.trim() || '—';
 
-  doc.setFillColor(...LBLUE);
-  doc.rect(MX, y, CONT_W, 6, 'F');
+  // ── Header azul escuro ──────────────────────────────────
+  doc.setFillColor(...DBLUE);
+  doc.rect(MX, y, CONT_W, HEADER_H, 'F');
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(...DBLUE);
-  doc.text('EVIDÊNCIAS FOTOGRÁFICAS:', MX + 2, y + 4);
-  y += 6;
+  doc.setFontSize(5.5);
+  doc.setTextColor(...LBLUE);
+  doc.text('ATIVIDADE', MX + 3, y + 3.5);
 
-  const regL = `REG.${String(regInicio).padStart(3, '0')}`;
-  const regR = `REG.${String(regFim).padStart(3, '0')}`;
-
-  doc.setFillColor(...LGRAY);
-  doc.rect(MX, y, PHOTO_W, 6, 'F');
-  doc.rect(xR, y, PHOTO_W, 6, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(...DBLUE);
-  doc.text(`${regL}  REGISTRO INÍCIO DOS TRABALHOS`, MX + 2, y + 4);
-  doc.text(`${regR}  REGISTRO DO FIM DOS TRABALHOS`, xR + 2, y + 4);
-  y += 6;
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(atividade, MX + 3, y + 7.8);
 
+  const QTD_W = 24;
+  const QTD_X = MX + CONT_W - QTD_W - 3;
+  doc.setFillColor(...PILL_BLUE);
+  doc.setDrawColor(...LBLUE);
+  doc.setLineWidth(0.3);
+  doc.rect(QTD_X, y + 1.5, QTD_W, HEADER_H - 3, 'FD');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.5);
+  doc.setTextColor(...LBLUE);
+  doc.text('QTD', QTD_X + QTD_W / 2, y + 4, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(qtd, QTD_X + QTD_W / 2, y + 7.5, { align: 'center' });
+
+  y += HEADER_H;
+
+  // ── Linha REG.001 INÍCIO | REG.002 FINAL ───────────────
+  doc.setFillColor(...LBLUE_LIGHT);
+  doc.rect(MX, y, CONT_W, REG_H, 'F');
+  const SEP_X = MX + PHOTO_W + 2;
+  doc.setDrawColor(...LBLUE);
+  doc.setLineWidth(0.3);
+  doc.line(SEP_X, y, SEP_X, y + REG_H);
+  drawRegRow(doc, regStart, 'INÍCIO', MX, y);
+  drawRegRow(doc, regStart + 1, 'FINAL', xR, y);
+  y += REG_H;
+
+  // ── Par de fotos principal ──────────────────────────────
   doc.setDrawColor(...GRAY);
   doc.rect(MX, y, PHOTO_W, PHOTO_H);
   doc.rect(xR, y, PHOTO_W, PHOTO_H);
-
-  if (servico.fotoInicio) {
-    const fmt = servico.fotoInicio.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-    try { doc.addImage(servico.fotoInicio, fmt, MX + 0.5, y + 0.5, PHOTO_W - 1, PHOTO_H - 1); }
-    catch { drawPlaceholder(doc, MX, y); }
-  } else {
-    drawPlaceholder(doc, MX, y);
-  }
-
-  if (servico.fotoFim) {
-    const fmt = servico.fotoFim.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-    try { doc.addImage(servico.fotoFim, fmt, xR + 0.5, y + 0.5, PHOTO_W - 1, PHOTO_H - 1); }
-    catch { drawPlaceholder(doc, xR, y); }
-  } else {
-    drawPlaceholder(doc, xR, y);
-  }
-
+  drawPhoto(doc, servico.fotoInicio, MX, y);
+  drawPhoto(doc, servico.fotoFim, xR, y);
   y += PHOTO_H + 4;
+
+  // ── Evidências extras ───────────────────────────────────
+  const extras = servico.fotosExtras ?? [];
+  for (let i = 0; i < extras.length; i += 2) {
+    if (y + REG_H + PHOTO_H + 4 > PAGE_H - MX) {
+      doc.addPage();
+      y = MX;
+    }
+    const regA = regStart + 2 + i;
+    const hasB = i + 1 < extras.length;
+    const regB = regA + 1;
+
+    doc.setFillColor(...LBLUE_LIGHT);
+    doc.rect(MX, y, CONT_W, REG_H, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(...DBLUE);
+    if (hasB) {
+      doc.setDrawColor(...LBLUE);
+      doc.setLineWidth(0.3);
+      doc.line(SEP_X, y, SEP_X, y + REG_H);
+      doc.text(`EVIDÊNCIA EXTRA ${i + 1}`, MX + 2, y + 3.3);
+      doc.text(`EVIDÊNCIA EXTRA ${i + 2}`, xR + 2, y + 3.3);
+    } else {
+      doc.text(`EVIDÊNCIA EXTRA ${i + 1}`, MX + 2, y + 3.3);
+    }
+    y += REG_H;
+
+    doc.setDrawColor(...GRAY);
+    doc.rect(MX, y, PHOTO_W, PHOTO_H);
+    if (hasB) doc.rect(xR, y, PHOTO_W, PHOTO_H);
+    drawPhoto(doc, extras[i] ?? '', MX, y);
+    if (hasB) drawPhoto(doc, extras[i + 1] ?? '', xR, y);
+    y += PHOTO_H + 4;
+  }
+
   return y;
 }
 
@@ -197,24 +244,32 @@ export async function exportCusteioToPdf(
     throw new Error('Preencha ao menos um serviço antes de exportar.');
   }
 
+  // Compressão de imagens antes de gerar o PDF
+  const allUrls = preenchidos.flatMap((s) => [s.fotoInicio, s.fotoFim, ...(s.fotosExtras ?? [])]);
+  const q = photoQuality(allUrls.filter(Boolean).length);
+  const compressedServicos = await Promise.all(
+    preenchidos.map(async (s) => ({
+      ...s,
+      fotoInicio: await compressImage(s.fotoInicio, q),
+      fotoFim: await compressImage(s.fotoFim, q),
+      fotosExtras: await compressAll(s.fotosExtras ?? [], q),
+    })),
+  );
+
   const banner = await loadBannerBase64();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as DocEx;
 
   let y = MX;
-  let reg = 1;
-
   y = drawHeader(doc, banner, cabecalho, y);
 
-  for (let i = 0; i < preenchidos.length; i++) {
-    const s = preenchidos[i]!;
-
+  let reg = 1;
+  for (const s of compressedServicos) {
     if (y + SEC_H > PAGE_H - MX) {
       doc.addPage();
       y = MX;
     }
-
-    y = drawEvidencia(doc, s, reg, reg + 1, y);
-    reg += 2;
+    y = drawEvidencia(doc, s, reg, y);
+    reg += 2 + (s.fotosExtras?.length ?? 0);
   }
 
   const fileName = buildCusteioExportFileName(cabecalho, 'pdf');

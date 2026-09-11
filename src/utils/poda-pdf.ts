@@ -1,9 +1,13 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
-import type { PodaServico } from '../stores/poda';
+import type { PodaCabecalho, PodaServico } from '../stores/poda';
 import { servicoPreenchido } from '../stores/poda';
 import { publicAsset } from './assets';
+import { buildPodaExportFileName } from './export-helpers';
+import { formatDistritalLabel } from './arrasto-helpers';
+import { validatePodaCabecalho } from './poda-helpers';
 import { savePdfWithWatermark } from './pdf-watermark';
+import { compressImage, photoQuality } from './compress-image';
 
 const BANNER_URL = publicAsset('template/banner.png');
 
@@ -38,12 +42,10 @@ async function loadBannerBase64(): Promise<string> {
 }
 
 // ── Cabeçalho (primeira página apenas) ───────────────────────────────────────
-function drawHeader(doc: DocEx, banner: string, y: number): number {
-  // Banner
+function drawHeader(doc: DocEx, banner: string, cabecalho: PodaCabecalho, y: number): number {
   doc.addImage(banner, 'PNG', MX, y, CONT_W, 18);
   y += 20;
 
-  // Título
   doc.setFillColor(...DBLUE);
   doc.rect(MX, y, CONT_W, 8, 'F');
   doc.setFont('helvetica', 'bold');
@@ -52,20 +54,52 @@ function drawHeader(doc: DocEx, banner: string, y: number): number {
   doc.text('RELATÓRIO DE EVIDÊNCIAS DOS SERVIÇOS EXECUTADOS', PAGE_W / 2, y + 5.5, { align: 'center' });
   y += 10;
 
-  // OBJETIVO + REGISTRO FOTOGRÁFICO
+  // Dados da OS — linha 1: PEP | NOTA | BASE | CIDADE
+  const colW = CONT_W / 4;
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MX, right: MX },
+    tableWidth: CONT_W,
+    theme: 'grid',
+    styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', halign: 'center', lineColor: GRAY, lineWidth: 0.2 },
+    headStyles: { fillColor: LBLUE, textColor: DBLUE, fontStyle: 'bold', halign: 'center', fontSize: 7 },
+    columnStyles: {
+      0: { cellWidth: colW },
+      1: { cellWidth: colW },
+      2: { cellWidth: colW },
+      3: { cellWidth: colW },
+    },
+    head: [['PEP', 'NOTA', 'BASE', 'CIDADE']],
+    body: [[
+      cabecalho.pep || '—',
+      cabecalho.nota || '—',
+      formatDistritalLabel(cabecalho.base) || '—',
+      cabecalho.cidade || '—',
+    ]],
+  });
+
+  y = (doc.lastAutoTable?.finalY ?? y + 8) + 0.5;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MX, right: MX },
+    tableWidth: CONT_W,
+    theme: 'grid',
+    styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', halign: 'center', lineColor: GRAY, lineWidth: 0.2 },
+    headStyles: { fillColor: LBLUE, textColor: DBLUE, fontStyle: 'bold', halign: 'center', fontSize: 7 },
+    head: [['DESCRIÇÃO DA OBRA']],
+    body: [[cabecalho.descricaoObra || '—']],
+  });
+
+  y = (doc.lastAutoTable?.finalY ?? y + 12) + 3;
+
   autoTable(doc, {
     startY: y,
     margin: { left: MX, right: MX },
     tableWidth: CONT_W,
     theme: 'grid',
     styles: { fontSize: 6.5, cellPadding: 2, valign: 'top', lineColor: GRAY, lineWidth: 0.2 },
-    headStyles: {
-      fillColor: LBLUE,
-      textColor: DBLUE,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 7,
-    },
+    headStyles: { fillColor: LBLUE, textColor: DBLUE, fontStyle: 'bold', halign: 'center', fontSize: 7 },
     columnStyles: {
       0: { cellWidth: CONT_W / 2 },
       1: { cellWidth: CONT_W / 2 },
@@ -150,23 +184,39 @@ function drawPlaceholder(doc: jsPDF, x: number, y: number) {
 }
 
 // ── Export principal ──────────────────────────────────────────────────────────
-export async function exportPodaToPdf(servicos: PodaServico[]): Promise<string> {
+export async function exportPodaToPdf(
+  cabecalho: PodaCabecalho,
+  servicos: PodaServico[],
+): Promise<string> {
+  const cabecalhoErrors = validatePodaCabecalho(cabecalho);
+  if (cabecalhoErrors.length > 0) {
+    throw new Error(cabecalhoErrors[0]);
+  }
+
   const preenchidos = servicos.filter(servicoPreenchido);
   if (preenchidos.length === 0) {
     throw new Error('Preencha ao menos um serviço antes de exportar.');
   }
 
+  const q = photoQuality(preenchidos.length * 2);
+  const compressedServicos = await Promise.all(
+    preenchidos.map(async (s) => ({
+      ...s,
+      fotoInicio: await compressImage(s.fotoInicio, q),
+      fotoFim: await compressImage(s.fotoFim, q),
+    })),
+  );
+
   const banner = await loadBannerBase64();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as DocEx;
 
   let y = MX;
-  let reg = 1; // contador sequencial de REG
+  let reg = 1;
 
-  // Primeira página: cabeçalho completo
-  y = drawHeader(doc, banner, y);
+  y = drawHeader(doc, banner, cabecalho, y);
 
-  for (let i = 0; i < preenchidos.length; i++) {
-    const s = preenchidos[i]!;
+  for (let i = 0; i < compressedServicos.length; i++) {
+    const s = compressedServicos[i]!;
 
     // Nova página se não couber a seção inteira
     if (y + SEC_H > PAGE_H - MX) {
@@ -178,9 +228,6 @@ export async function exportPodaToPdf(servicos: PodaServico[]): Promise<string> 
     reg += 2;
   }
 
-  // Rodapé e marca d'água aplicados em savePdfWithWatermark.
-
-  const ts = new Date().toISOString().slice(0, 10);
-  const fileName = `PODA_${ts}.pdf`;
+  const fileName = buildPodaExportFileName(cabecalho, 'pdf');
   return savePdfWithWatermark(doc, fileName);
 }

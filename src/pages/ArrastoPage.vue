@@ -93,10 +93,7 @@
                 :error-message="obraFieldError('distrital') ?? undefined"
               />
             </div>
-            <div class="col-12 col-md-4">
-              <q-input v-model="obra.reserva" label="Reserva" outlined dense hide-bottom-space />
-            </div>
-            <div class="col-12 col-md-8">
+            <div class="col-12">
               <q-input
                 v-model="obra.descricaoObra"
                 label="Descrição da Obra *"
@@ -408,6 +405,7 @@ import {
   validateArrastoParaExportacao,
 } from 'src/utils/arrasto-helpers';
 import type { ArrastoMaterial } from 'src/utils/arrasto-types';
+import { PROTECTED_FIELDS_PASSWORD } from 'src/config/protected-fields';
 import { setProtectedDefault } from 'src/utils/protected-defaults';
 
 const $q = useQuasar();
@@ -419,7 +417,7 @@ const abaAtiva = ref<'sintese' | 'materiais'>('materiais');
 const filtroMateriais = ref('');
 const validacaoAtiva = ref(false);
 const precoUnitarioLiberado = ref(false);
-const PRECO_UNITARIO_SENHA = 'CGB123';
+const PRECO_UNITARIO_SENHA = PROTECTED_FIELDS_PASSWORD;
 
 watch(
   () => precoUnitario.value,
